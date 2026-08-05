@@ -1,0 +1,154 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
+
+:root {
+  --bg-main: #0a0b0e;
+  --bg-card: #12141a;
+  --bg-card-hover: #191c24;
+  --bg-input: #0e1015;
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
+  --text-tertiary: #6b7280;
+
+  --color-1h: #10b981;
+  --color-3h: #f59e0b;
+  --color-6h: #8b5cf6;
+  --color-12h: #06b6d4;
+  --color-24h: #f43f5e;
+}
+
+* {
+  box-sizing: border-box;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  user-select: none;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 380px;
+  height: 520px;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Clean Card Component */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.card:hover {
+  border-color: var(--border-strong);
+}
+
+/* High-Contrast Segmented Navigation */
+.nav-tab {
+  flex: 1;
+  padding: 7px 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.nav-tab:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.nav-tab.active {
+  background: #1e222d;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* Clean Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 20px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #1e222d;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: 0.2s ease;
+  border-radius: 20px;
+}
+
+.toggle-track:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #9ca3af;
+  transition: 0.2s ease;
+  border-radius: 50%;
+}
+
+input:checked + .toggle-track {
+  background-color: var(--primary);
+  border-color: var(--primary-hover);
+}
+
+input:checked + .toggle-track:before {
+  transform: translateX(14px);
+  background-color: #ffffff;
+}
+
+/* Button & Form Control Focus */
+input:focus, select:focus, button:focus-visible {
+  outline: none;
+  border-color: var(--primary) !important;
+}
