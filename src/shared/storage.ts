@@ -2,20 +2,34 @@ import { ApplyFlowStorage, BlockedCompany, AppliedJobRecord } from './types';
 import { DEFAULT_STORAGE } from './constants';
 
 export async function getStorage(): Promise<ApplyFlowStorage> {
-  if (typeof chrome === 'undefined' || !chrome.storage) {
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.runtime?.id) {
     return DEFAULT_STORAGE;
   }
   return new Promise((resolve) => {
-    chrome.storage.local.get(DEFAULT_STORAGE, (res) => {
-      resolve(res as ApplyFlowStorage);
-    });
+    try {
+      chrome.storage.local.get(DEFAULT_STORAGE, (res) => {
+        if (chrome?.runtime?.lastError) {
+          resolve(DEFAULT_STORAGE);
+        } else {
+          resolve((res as ApplyFlowStorage) || DEFAULT_STORAGE);
+        }
+      });
+    } catch {
+      resolve(DEFAULT_STORAGE);
+    }
   });
 }
 
 export async function setStorage(data: Partial<ApplyFlowStorage>): Promise<void> {
-  if (typeof chrome === 'undefined' || !chrome.storage) return;
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.runtime?.id) return;
   return new Promise((resolve) => {
-    chrome.storage.local.set(data, resolve);
+    try {
+      chrome.storage.local.set(data, () => {
+        resolve();
+      });
+    } catch {
+      resolve();
+    }
   });
 }
 
