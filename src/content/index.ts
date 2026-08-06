@@ -2,6 +2,7 @@ import { processJobCardsForBlocklist } from './modules/companyBlocker';
 import { injectRecruiterOutreachBanner } from './modules/recruiterCard';
 import { translateEasyApplyForm } from './modules/translator';
 import { ensureTimeFilterPreserved } from './modules/timeFilter';
+import { processAppliedJobs, autoLogActiveJobApplication } from './modules/appliedHider';
 import { LINKEDIN_SELECTORS } from '../shared/constants';
 
 function runModulesSweep() {
@@ -9,9 +10,11 @@ function runModulesSweep() {
   const cards = Array.from(document.querySelectorAll<HTMLElement>(LINKEDIN_SELECTORS.jobCard));
   if (cards.length > 0) {
     processJobCardsForBlocklist(cards);
+    processAppliedJobs(cards);
   }
   injectRecruiterOutreachBanner();
   translateEasyApplyForm();
+  autoLogActiveJobApplication();
 }
 
 function initApplyFlow() {
