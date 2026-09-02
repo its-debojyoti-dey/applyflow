@@ -17,7 +17,8 @@
     "scripting"
   ],
   "host_permissions": [
-    "https://www.linkedin.com/*"
+    "https://www.linkedin.com/*",
+    "https://www.ycombinator.com/*"
   ],
   "background": {
     "service_worker": "src/background/index.ts",
@@ -26,7 +27,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.linkedin.com/jobs/*"
+        "https://www.linkedin.com/jobs/*",
+        "https://www.ycombinator.com/companies*"
       ],
       "js": [
         "src/content/index.ts"

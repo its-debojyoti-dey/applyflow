@@ -1,3 +1,10 @@
+export interface FilterBarSettings {
+  enabled: boolean;
+  hidePromoted: boolean;
+  strictTitleMatch: boolean;
+  hideAgencies: boolean;
+}
+
 export interface ApplyFlowSettings {
   autoHideApplied: boolean;
   autoHideBlocked: boolean;
@@ -5,7 +12,9 @@ export interface ApplyFlowSettings {
   highlightCompetition: boolean;
   autoTranslateForms: boolean;
   targetLanguage: string;
+  filterBar: FilterBarSettings;
 }
+
 
 export interface BlockedCompany {
   id: string;
@@ -37,5 +46,7 @@ export interface ApplyFlowStorage {
   settings: ApplyFlowSettings;
   blockedCompanies: BlockedCompany[];
   appliedJobs: Record<string, AppliedJobRecord>;
+  noEmailJobs: Record<string, AppliedJobRecord>;
   templates: OutreachTemplate[];
 }
+

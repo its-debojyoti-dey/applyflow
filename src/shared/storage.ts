@@ -11,7 +11,14 @@ export async function getStorage(): Promise<ApplyFlowStorage> {
         if (chrome?.runtime?.lastError) {
           resolve(DEFAULT_STORAGE);
         } else {
-          resolve((res as ApplyFlowStorage) || DEFAULT_STORAGE);
+          const store = (res as ApplyFlowStorage) || DEFAULT_STORAGE;
+          if (!store.noEmailJobs) {
+            store.noEmailJobs = {};
+          }
+          if (!store.appliedJobs) {
+            store.appliedJobs = {};
+          }
+          resolve(store);
         }
       });
     } catch {
@@ -57,4 +64,24 @@ export async function saveAppliedJob(record: AppliedJobRecord): Promise<void> {
   const store = await getStorage();
   const updated = { ...store.appliedJobs, [record.jobId]: record };
   await setStorage({ appliedJobs: updated });
+}
+
+export async function removeAppliedJob(jobId: string): Promise<void> {
+  const store = await getStorage();
+  const updated = { ...store.appliedJobs };
+  delete updated[jobId];
+  await setStorage({ appliedJobs: updated });
+}
+
+export async function saveNoEmailJob(record: AppliedJobRecord): Promise<void> {
+  const store = await getStorage();
+  const updated = { ...(store.noEmailJobs || {}), [record.jobId]: record };
+  await setStorage({ noEmailJobs: updated });
+}
+
+export async function removeNoEmailJob(jobId: string): Promise<void> {
+  const store = await getStorage();
+  const updated = { ...(store.noEmailJobs || {}) };
+  delete updated[jobId];
+  await setStorage({ noEmailJobs: updated });
 }

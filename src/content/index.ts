@@ -3,6 +3,9 @@ import { injectRecruiterOutreachBanner } from './modules/recruiterCard';
 import { translateEasyApplyForm } from './modules/translator';
 import { ensureTimeFilterPreserved } from './modules/timeFilter';
 import { processAppliedJobs, autoLogActiveJobApplication } from './modules/appliedHider';
+import { processYcCompanyCards } from './modules/ycAppliedHider';
+import { processJobCardsLiveFilter } from './modules/liveDomFilter';
+import { mountFilterBar } from './modules/filterBar';
 import { LINKEDIN_SELECTORS } from '../shared/constants';
 
 let timerId: ReturnType<typeof setInterval> | null = null;
@@ -14,21 +17,29 @@ function isContextValid(): boolean {
 
 function runModulesSweep() {
   if (!isContextValid()) {
-    // Extension was reloaded or context invalidated - clean up timers and observers gracefully
     if (timerId) clearInterval(timerId);
     if (domObserver) domObserver.disconnect();
     return;
   }
 
-  ensureTimeFilterPreserved();
-  const cards = Array.from(document.querySelectorAll<HTMLElement>(LINKEDIN_SELECTORS.jobCard));
-  if (cards.length > 0) {
-    processJobCardsForBlocklist(cards);
-    processAppliedJobs(cards);
+  const hostname = window.location.hostname;
+
+  if (hostname.includes('ycombinator.com')) {
+    processYcCompanyCards();
+  } else if (hostname.includes('linkedin.com')) {
+    ensureTimeFilterPreserved();
+    mountFilterBar();
+
+    const cards = Array.from(document.querySelectorAll<HTMLElement>(LINKEDIN_SELECTORS.jobCard));
+    if (cards.length > 0) {
+      processJobCardsLiveFilter(cards);
+      processJobCardsForBlocklist(cards);
+      processAppliedJobs(cards);
+    }
+    injectRecruiterOutreachBanner();
+    translateEasyApplyForm();
+    autoLogActiveJobApplication();
   }
-  injectRecruiterOutreachBanner();
-  translateEasyApplyForm();
-  autoLogActiveJobApplication();
 }
 
 function initApplyFlow() {

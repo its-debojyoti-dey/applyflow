@@ -11,10 +11,11 @@ import {
   RefreshCw,
   Building2,
   ArrowRight,
-  Filter
+  Filter,
+  MailX,
 } from 'lucide-react';
-import { getStorage, setStorage, addBlockedCompany, removeBlockedCompany } from '../shared/storage';
-import { ApplyFlowStorage, ApplyFlowSettings, BlockedCompany } from '../shared/types';
+import { getStorage, setStorage, addBlockedCompany, removeBlockedCompany, removeAppliedJob, removeNoEmailJob } from '../shared/storage';
+import { ApplyFlowStorage, ApplyFlowSettings, BlockedCompany, FilterBarSettings } from '../shared/types';
 
 type TabType = 'filters' | 'blocklist' | 'tracker' | 'settings';
 
@@ -29,6 +30,7 @@ const PRESETS = [
 export default function App() {
   const [data, setData] = useState<ApplyFlowStorage | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('filters');
+  const [trackerSubTab, setTrackerSubTab] = useState<'applied' | 'noEmail'>('applied');
   const [newCompany, setNewCompany] = useState('');
   const [customHours, setCustomHours] = useState<number | ''>('');
   const [blocklistSearch, setBlocklistSearch] = useState('');
@@ -54,10 +56,19 @@ export default function App() {
   }
 
   const handleOpenTimeFilter = (secondsParam: string) => {
-    const targetUrl = `https://www.linkedin.com/jobs/search/?f_TPR=${secondsParam}&sortBy=DD`;
     if (typeof chrome !== 'undefined' && chrome.tabs) {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const currentTab = tabs[0];
+        if (currentTab?.id && currentTab.url?.includes('linkedin.com/jobs')) {
+          try {
+            const url = new URL(currentTab.url);
+            url.searchParams.set('f_TPR', secondsParam);
+            url.searchParams.set('sortBy', 'DD');
+            chrome.tabs.update(currentTab.id, { url: url.toString() });
+            return;
+          } catch {}
+        }
+        const targetUrl = `https://www.linkedin.com/jobs/search/?f_TPR=${secondsParam}&sortBy=DD`;
         if (currentTab?.id && currentTab.url?.includes('linkedin.com')) {
           chrome.tabs.update(currentTab.id, { url: targetUrl });
         } else {
@@ -65,7 +76,7 @@ export default function App() {
         }
       });
     } else {
-      window.open(targetUrl, '_blank');
+      window.open(`https://www.linkedin.com/jobs/search/?f_TPR=${secondsParam}&sortBy=DD`, '_blank');
     }
   };
 
@@ -90,6 +101,16 @@ export default function App() {
     await refreshStorage();
   };
 
+  const handleDeleteAppliedJob = async (jobId: string) => {
+    await removeAppliedJob(jobId);
+    await refreshStorage();
+  };
+
+  const handleDeleteNoEmailJob = async (jobId: string) => {
+    await removeNoEmailJob(jobId);
+    await refreshStorage();
+  };
+
   const handleClearAllBlocked = async () => {
     if (confirm('Clear all blocked companies?')) {
       await setStorage({ blockedCompanies: [] });
@@ -102,6 +123,26 @@ export default function App() {
     const updatedSettings: ApplyFlowSettings = {
       ...data.settings,
       [key]: typeof data.settings[key] === 'boolean' ? !data.settings[key] : data.settings[key],
+    };
+    await setStorage({ settings: updatedSettings });
+    setData({ ...data, settings: updatedSettings });
+    triggerSaveNotify();
+  };
+
+  const handleToggleFilterSetting = async (key: keyof FilterBarSettings) => {
+    if (!data) return;
+    const currentFilterBar = data.settings.filterBar || {
+      enabled: true,
+      hidePromoted: true,
+      strictTitleMatch: false,
+      hideAgencies: true,
+    };
+    const updatedSettings: ApplyFlowSettings = {
+      ...data.settings,
+      filterBar: {
+        ...currentFilterBar,
+        [key]: !currentFilterBar[key],
+      },
     };
     await setStorage({ settings: updatedSettings });
     setData({ ...data, settings: updatedSettings });
@@ -129,6 +170,11 @@ export default function App() {
   );
 
   const appliedJobsList = Object.values(data.appliedJobs || {}).filter((job) =>
+    job.title.toLowerCase().includes(trackerSearch.toLowerCase()) ||
+    job.company.toLowerCase().includes(trackerSearch.toLowerCase())
+  );
+
+  const noEmailJobsList = Object.values(data.noEmailJobs || {}).filter((job) =>
     job.title.toLowerCase().includes(trackerSearch.toLowerCase()) ||
     job.company.toLowerCase().includes(trackerSearch.toLowerCase())
   );
@@ -188,7 +234,7 @@ export default function App() {
         {[
           { id: 'filters', label: 'Search', icon: Filter },
           { id: 'blocklist', label: `Blocked (${data.blockedCompanies.length})`, icon: ShieldOff },
-          { id: 'tracker', label: `Log (${Object.keys(data.appliedJobs || {}).length})`, icon: Briefcase },
+          { id: 'tracker', label: `Log (${Object.keys(data.appliedJobs || {}).length + Object.keys(data.noEmailJobs || {}).length})`, icon: Briefcase },
           { id: 'settings', label: 'Settings', icon: Settings },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -459,14 +505,63 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 3: APPLIED JOBS LOG */}
+        {/* TAB 3: APPLIED JOBS & NO EMAIL LOG */}
         {activeTab === 'tracker' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Sub-tab segmented toggle */}
+            <div style={{ display: 'flex', gap: 6, background: '#0d0e14', padding: '4px', borderRadius: 6, border: '1px solid var(--border-subtle)' }}>
+              <button
+                type="button"
+                onClick={() => setTrackerSubTab('applied')}
+                style={{
+                  flex: 1,
+                  padding: '6px 10px',
+                  borderRadius: 4,
+                  border: 'none',
+                  background: trackerSubTab === 'applied' ? 'var(--primary)' : 'transparent',
+                  color: trackerSubTab === 'applied' ? '#ffffff' : 'var(--text-secondary)',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6
+                }}
+              >
+                <Briefcase size={12} />
+                Applied ({Object.keys(data.appliedJobs || {}).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTrackerSubTab('noEmail')}
+                style={{
+                  flex: 1,
+                  padding: '6px 10px',
+                  borderRadius: 4,
+                  border: 'none',
+                  background: trackerSubTab === 'noEmail' ? '#f59e0b' : 'transparent',
+                  color: trackerSubTab === 'noEmail' ? '#ffffff' : 'var(--text-secondary)',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6
+                }}
+              >
+                <MailX size={12} />
+                No Email ({Object.keys(data.noEmailJobs || {}).length})
+              </button>
+            </div>
+
+            {/* Search Bar */}
             <div style={{ position: 'relative' }}>
               <Search size={12} style={{ position: 'absolute', left: 8, top: 9, color: 'var(--text-tertiary)' }} />
               <input
                 type="text"
-                placeholder="Search logged jobs..."
+                placeholder={trackerSubTab === 'applied' ? "Search applied companies..." : "Search no-email companies..."}
                 value={trackerSearch}
                 onChange={(e) => setTrackerSearch(e.target.value)}
                 style={{
@@ -483,43 +578,122 @@ export default function App() {
               />
             </div>
 
-            <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-              {appliedJobsList.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '28px 12px', color: 'var(--text-tertiary)', fontSize: 12 }}>
-                  <Briefcase size={22} style={{ marginBottom: 6, opacity: 0.4 }} />
-                  <p style={{ margin: 0, fontWeight: 500 }}>No applications logged yet.</p>
-                  <p style={{ margin: '4px 0 0 0', fontSize: 10 }}>Applied jobs on LinkedIn will automatically save here.</p>
-                </div>
-              ) : (
-                appliedJobsList.map((job) => (
-                  <div
-                    key={job.jobId}
-                    className="card"
-                    style={{
-                      padding: 10,
-                      marginBottom: 6
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>{job.title}</div>
-                      {job.url && (
-                        <a
-                          href={job.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ color: 'var(--text-tertiary)', textDecoration: 'none' }}
-                        >
-                          <ExternalLink size={12} />
-                        </a>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, fontWeight: 500 }}>{job.company}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 9, color: 'var(--text-tertiary)' }}>
-                      <span>{job.location}</span>
-                      <span>{new Date(job.appliedAt).toLocaleDateString()}</span>
-                    </div>
+            {/* List Container */}
+            <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+              {trackerSubTab === 'applied' ? (
+                appliedJobsList.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '28px 12px', color: 'var(--text-tertiary)', fontSize: 12 }}>
+                    <Briefcase size={22} style={{ marginBottom: 6, opacity: 0.4 }} />
+                    <p style={{ margin: 0, fontWeight: 500 }}>No applications logged yet.</p>
+                    <p style={{ margin: '4px 0 0 0', fontSize: 10 }}>Applied jobs on LinkedIn or YC will automatically save here.</p>
                   </div>
-                ))
+                ) : (
+                  appliedJobsList.map((job) => (
+                    <div
+                      key={job.jobId}
+                      className="card"
+                      style={{
+                        padding: 10,
+                        marginBottom: 6
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>{job.title}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {job.url && (
+                            <a
+                              href={job.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ color: 'var(--text-tertiary)', textDecoration: 'none' }}
+                              title="Open URL"
+                            >
+                              <ExternalLink size={12} />
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAppliedJob(job.jobId)}
+                            title="Remove from applied list"
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#f43f5e',
+                              cursor: 'pointer',
+                              padding: 2,
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, fontWeight: 500 }}>{job.company}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 9, color: 'var(--text-tertiary)' }}>
+                        <span>{job.location}</span>
+                        <span>{new Date(job.appliedAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  ))
+                )
+              ) : (
+                noEmailJobsList.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '28px 12px', color: 'var(--text-tertiary)', fontSize: 12 }}>
+                    <MailX size={22} style={{ marginBottom: 6, opacity: 0.4 }} />
+                    <p style={{ margin: 0, fontWeight: 500 }}>No 'No Email' companies logged yet.</p>
+                    <p style={{ margin: '4px 0 0 0', fontSize: 10 }}>Click '+ No Email' on YC company cards to add them here.</p>
+                  </div>
+                ) : (
+                  noEmailJobsList.map((job) => (
+                    <div
+                      key={job.jobId}
+                      className="card"
+                      style={{
+                        padding: 10,
+                        marginBottom: 6
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>{job.company}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {job.url && (
+                            <a
+                              href={job.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ color: 'var(--text-tertiary)', textDecoration: 'none' }}
+                              title="Open URL"
+                            >
+                              <ExternalLink size={12} />
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteNoEmailJob(job.jobId)}
+                            title="Remove from no email list"
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#f43f5e',
+                              cursor: 'pointer',
+                              padding: 2,
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, fontWeight: 500 }}>{job.title}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 9, color: 'var(--text-tertiary)' }}>
+                        <span>{job.location}</span>
+                        <span>Marked {new Date(job.appliedAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  ))
+                )
               )}
             </div>
           </div>
@@ -543,6 +717,41 @@ export default function App() {
                 <CheckCircle2 size={13} /> Settings saved
               </div>
             )}
+
+            <div className="card" style={{ padding: 12 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 10 }}>
+                ⚡ Classic Filters & AI Bypass Bar
+              </span>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {[
+                  { key: 'enabled', label: 'Show in-page classic filter bar on LinkedIn' },
+                  { key: 'hidePromoted', label: 'Auto-hide Promoted/Sponsored job postings' },
+                  { key: 'strictTitleMatch', label: 'Strict title matching (only show keyword matches)' },
+                  { key: 'hideAgencies', label: 'Auto-hide third-party staffing agencies' },
+                ].map((item) => {
+                  const fb = data.settings.filterBar || {
+                    enabled: true,
+                    hidePromoted: true,
+                    strictTitleMatch: false,
+                    hideAgencies: true,
+                  };
+                  return (
+                    <label key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: 11, color: 'var(--text-secondary)' }}>
+                      <span>{item.label}</span>
+                      <span className="toggle-switch">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(fb[item.key as keyof FilterBarSettings])}
+                          onChange={() => handleToggleFilterSetting(item.key as keyof FilterBarSettings)}
+                        />
+                        <span className="toggle-track" />
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
 
             <div className="card" style={{ padding: 12 }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 10 }}>
